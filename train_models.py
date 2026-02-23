@@ -6,6 +6,7 @@ import pickle
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
@@ -60,6 +61,11 @@ preprocessor = ColumnTransformer(
     ]
 )
 
+# Importante: no reutilizar el mismo objeto `preprocessor` en 2 pipelines,
+# porque se comparte estado al hacer `.fit()`.
+preprocessor_rf = clone(preprocessor)
+preprocessor_xgb = clone(preprocessor)
+
 # =========================
 # 4. SPLIT TRAIN / VALIDATION
 # =========================
@@ -73,7 +79,7 @@ X_train, X_val, y_train, y_val = train_test_split(
 # =========================
 
 rf_pipeline = Pipeline(steps=[
-    ("preprocessor", preprocessor),
+    ("preprocessor", preprocessor_rf),
     ("model", RandomForestRegressor(
         n_estimators=300,
         random_state=42,
@@ -97,7 +103,7 @@ print("Random Forest RMSE:", rf_rmse)
 # =========================
 
 xgb_pipeline = Pipeline(steps=[
-    ("preprocessor", preprocessor),
+    ("preprocessor", preprocessor_xgb),
     ("model", XGBRegressor(
         n_estimators=800,
         learning_rate=0.03,
@@ -125,6 +131,10 @@ print("XGBoost RMSE:", xgb_rmse)
 # =========================
 # 7. GUARDAR AMBOS MODELOS
 # =========================
+
+# Re-entrenar con todos los datos etiquetados disponibles (train + validation)
+rf_pipeline.fit(X, y)
+xgb_pipeline.fit(X, y)
 
 with open("models/random_forest_model.pkl", "wb") as f:
     pickle.dump(rf_pipeline, f)
